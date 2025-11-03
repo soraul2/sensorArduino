@@ -19,9 +19,9 @@
  */
 
 // --- 0. 사용자 설정 (필수!) ---
-#define YOUR_WIFI_SSID "iptime" // 여기에 WiFi SSID 입력
-#define YOUR_WIFI_PASS "12345678" // 여기에 WiFi 비밀번호 입력
-#define YOUR_DEVICE_SERIAL_NUMBER "MIRACLE_FARM_001" // DB에 등록할 장치 시리얼
+#define YOUR_WIFI_SSID "Farm_2.4g" // 여기에 WiFi SSID 입력
+#define YOUR_WIFI_PASS "20240603" // 여기에 WiFi 비밀번호 입력
+#define YOUR_DEVICE_SERIAL_NUMBER "PLANTOFACTORY_SENSOR_A001" // DB에 등록할 장치 시리얼
 // --- 0. 설정 끝 ---
 
 
@@ -65,7 +65,7 @@ const char* broker = "eafc441602df4e36aed5f15ad6df2e4c.s1.eu.hivemq.cloud";
 const int port = 8883;
 const char* mqttUser = "daesin_302";
 const char* mqttPass = "!Ds123456"; 
-const char* deviceSerial = YOUR_DEVICE_SERIAL_NUMBER;
+const char* deviceSerial = "PLANTOFACTORY_SENSOR_A001";
 
 // --- 4. 객체 생성 ---
 // WiFi / MQTT 객체
@@ -609,9 +609,9 @@ void calculateTdsAndEc(int analogValue, float temperature) {
  * @brief (교정 완료) pH 아날로그 값을 pH 값으로 변환합니다.
  */
 float convertAnalogToPH(int analogValue, float temperature) {
-  const float VOLTAGE_PH6_86 = 2.833; 
-  const float VOLTAGE_PH4_01 = 3.356; 
-  const float VOLTAGE_PH9_18 = 2.410;
+  const float VOLTAGE_PH6_86 = 2.813; 
+  const float VOLTAGE_PH4_01 = 3.266; 
+  const float VOLTAGE_PH9_18 = 2.405;
 
   float voltage = analogValue * (VOLTAGE_REFERENCE / ADC_RESOLUTION);
   float ph;
