@@ -19,8 +19,8 @@
  */
 
 // --- 0. 사용자 설정 (필수!) ---
-#define YOUR_WIFI_SSID "Farm_2.4g" // 여기에 WiFi SSID 입력
-#define YOUR_WIFI_PASS "20240603" // 여기에 WiFi 비밀번호 입력
+#define YOUR_WIFI_SSID "sfarm_2.4g" // 여기에 WiFi SSID 입력
+#define YOUR_WIFI_PASS "ds123456" // 여기에 WiFi 비밀번호 입력
 #define YOUR_DEVICE_SERIAL_NUMBER "PLANTOFACTORY_SENSOR_A001" // DB에 등록할 장치 시리얼
 // --- 0. 설정 끝 ---
 
@@ -98,15 +98,15 @@ bool isSCD41_active = false;
 bool isVEML7700_active = false; 
 unsigned long previousDhtMillis = 0;
 unsigned long previousLightMillis = 0; 
-const long dhtInterval = 2000; 
+const long dhtInterval = 20000; // 👈 [요청 사항] 20000으로 수정 (20초)
 const long lightInterval = 2000; 
 unsigned long previousWaterSensorMillis = 0;
-const long phStabilizeTime = 3000;
+const long phStabilizeTime = 10000; // 10초 안정화
 const long cycleInterval = 10000; 
 enum WaterSensorState { STATE_READ_TDS_TEMP, STATE_WAIT_PH_STABILIZE, STATE_READ_PH, STATE_WAIT_NEXT_CYCLE };
 WaterSensorState currentWaterState = STATE_READ_TDS_TEMP;
 const float VOLTAGE_REFERENCE = 5.0;
-const float ADC_RESOLUTION = 16383.0; // 14비트
+const float ADC_RESOLUTION = 1023.0; // 👈 [수정] 14비트(16383.0) -> 10비트(1023.0)
 
 
 void setup() {
@@ -114,9 +114,9 @@ void setup() {
   Serial.println("--- 스마트팜 센서 시스템 (MQTT) 시작 ---");
   
   // --- 1. ADC 및 핀 설정 ---
-  analogReadResolution(14);
+  analogReadResolution(10); // 👈 [수정] 14 -> 10
   randomSeed(analogRead(RANDOM_SEED_PIN)); 
-  Serial.println("ADC 14비트, 랜덤 시드 설정 완료.");
+  Serial.println("ADC 10비트, 랜덤 시드 설정 완료."); // 👈 [수정] "14비트" -> "10비트"
 
   pinMode(PH_RELAY_VCC_PIN, OUTPUT);
   pinMode(PH_RELAY_GND_PIN, OUTPUT);
@@ -471,7 +471,7 @@ void manageDhtSensor(unsigned long currentMillis) {
 
     // [MQTT 전송 트리거]
     String now = getIsoTimestamp(); // --- [수정] 내장 RTC 시간 가져오기 ---
-    publishMqttMessage("plantofactory/sensor/air_temperature", airTemperature, now);
+    publishMqttMessage("plantofactory/sensor/air_temperature", airTemperature, now); // 👈 [오류 수정] publishMDqttMessage -> publishMqttMessage
     publishMqttMessage("plantofactory/sensor/air_humidity_relative", airHumidity, now);
     publishMqttMessage("plantofactory/sensor/air_humidity_absolute", absoluteHumidity, now);
   }
@@ -533,14 +533,27 @@ void manageWaterSensors(unsigned long currentMillis) {
     }
 
     case STATE_READ_PH: {
-      Serial.println("[상태 3] pH 측정 시작...");
+      Serial.println("[상태 3] pH 측정 시작 (평균값 계산)...");
 
-      // pH 측정
-      int phAnalogValue = analogRead(PH_PIN);
-      phValue = convertAnalogToPH(phAnalogValue, waterTemperature);
+      // --- [요청 사항] pH 평균값 계산 로직 추가 ---
+      const int numPhSamples = 50; // 👈 [요청 사항] 50회 샘플링
+      long totalPhAnalogValue = 0;
+
+      for (int i = 0; i < numPhSamples; i++) {
+        totalPhAnalogValue += analogRead(PH_PIN);
+        delay(50); // 샘플링 간 50ms 딜레이 (총 2.5초 소요)
+      }
+
+      int averagePhAnalogValue = totalPhAnalogValue / numPhSamples;
+      // --- [수정 끝] ---
+
+
+      // pH 측정 (평균 아날로그 값 사용)
+      phValue = convertAnalogToPH(averagePhAnalogValue, waterTemperature);
 
       // [시리얼 출력]
-      Serial.print("  > pH: "); Serial.print(phValue);
+      Serial.print("  > [평균] Analog: "); Serial.print(averagePhAnalogValue); // 디버깅용
+      Serial.print("  | pH: "); Serial.print(phValue);
       Serial.print("\t | EC: "); Serial.print(ecValue); Serial.println(" uS/cm");
 
       // [MQTT 전송 트리거]
@@ -599,8 +612,8 @@ void calculateTdsAndEc(int analogValue, float temperature) {
   float compensationCoefficient = 1.0 + 0.02 * (temperature - 25.0);
   float compensationVoltage = voltage / compensationCoefficient;
   ecValue = (133.42 * compensationVoltage * compensationVoltage * compensationVoltage 
-             - 255.86 * compensationVoltage * compensationVoltage 
-             + 857.39 * compensationVoltage);
+           - 255.86 * compensationVoltage * compensationVoltage 
+           + 857.39 * compensationVoltage);
   float k_factor = 0.5;
   tdsValue = ecValue * k_factor;
 }
@@ -609,9 +622,9 @@ void calculateTdsAndEc(int analogValue, float temperature) {
  * @brief (교정 완료) pH 아날로그 값을 pH 값으로 변환합니다.
  */
 float convertAnalogToPH(int analogValue, float temperature) {
-  const float VOLTAGE_PH6_86 = 2.813; 
-  const float VOLTAGE_PH4_01 = 3.266; 
-  const float VOLTAGE_PH9_18 = 2.405;
+  const float VOLTAGE_PH6_86 = 2.4; 
+  const float VOLTAGE_PH4_01 = 2.6; 
+  const float VOLTAGE_PH9_18 = 2.2;
 
   float voltage = analogValue * (VOLTAGE_REFERENCE / ADC_RESOLUTION);
   float ph;
